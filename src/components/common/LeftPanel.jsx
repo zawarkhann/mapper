@@ -3,19 +3,11 @@ import { Plus, Send } from "lucide-react";
 import { useAppContext } from "../../AppContext";
 
 export default function LeftPanel() {
-  const { imageUrl, address } = useAppContext();
+  const { imageUrl } = useAppContext();
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState("");
-  const chatEndRef = useRef(null); 
-
-  // Predefined bot responses
-  const botResponses = [
-    "I can help you find great places around!",
-    "Let me know what you're searching for.",
-    "Looking for something specific?",
-    "Tell me more about what you're looking for!",
-    "I'm here to help. Just ask!",
-  ];
+  const [isTyping, setIsTyping] = useState(false);
+  const chatEndRef = useRef(null);
 
   // Add default bot message when component mounts
   useEffect(() => {
@@ -23,29 +15,40 @@ export default function LeftPanel() {
       { text: "To give you the best suggestions, what are your interests?", sender: "bot" },
     ]);
   }, []);
+
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   // Function to send message
-  const sendMessage = () => {
+  const sendMessage = async () => {
     if (inputMessage.trim() === "") return;
 
     const userMessage = { text: inputMessage, sender: "user" };
-
-    // Clear input
-    setInputMessage("");
-
     setMessages((prev) => [...prev, userMessage]);
+    setInputMessage("");
+    setIsTyping(true);
 
-    // Simulate bot response after a short delay
-    setTimeout(() => {
-      const botReply = {
-        text: botResponses[Math.floor(Math.random() * botResponses.length)], // Random bot response
-        sender: "bot",
-      };
-      setMessages((prev) => [...prev, botReply]);
-    }, 1000); // 1-second delay for bot reply
+    try {
+      const response = await fetch("https://house-analysis-439e40d8d94b.herokuapp.com/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ data: userMessage.text }),
+      });
+
+      const result = await response.json();
+      console.log(result)
+      if (result) {
+        setMessages((prev) => [...prev, { text: result, sender: "bot" }]);
+      } else {
+        setMessages((prev) => [...prev, { text: "Unexpected response from server.", sender: "bot" }]);
+      }
+    } catch (error) {
+      setMessages((prev) => [...prev, { text: "Error connecting to server!", sender: "bot" }]);
+    }
+    setIsTyping(false);
   };
 
   return (
@@ -68,13 +71,17 @@ export default function LeftPanel() {
             key={index}
             className={`text-sm border border-gray-200 rounded-xl py-3 px-4 max-w-[70%] break-words 
               ${msg.sender === "bot" ? "bg-purple-600 text-white self-start" : "bg-gray-400 text-black self-end ml-auto"}`}
-            style={{ wordWrap: "break-word", overflowWrap: "break-word" }} // Ensures long words wrap
+            style={{ wordWrap: "break-word", overflowWrap: "break-word" }}
           >
-          
             <p>{msg.text}</p>
           </div>
         ))}
-         <div ref={chatEndRef} /> 
+        {isTyping && (
+          <div className="text-sm bg-purple-600 text-white self-start border border-gray-200 rounded-xl py-3 px-4 max-w-[70%]">
+            Typing...
+          </div>
+        )}
+        <div ref={chatEndRef} />
       </div>
 
       {/* Chat Input */}
